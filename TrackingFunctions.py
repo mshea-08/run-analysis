@@ -95,6 +95,11 @@ def add_velocities(match_tracking_data):
     return match_tracking_data
 
 def create_player_positions(match_data,match_tracking_data,frame):
+    """
+    Creates the Data Frame player_positions for a given time stamp. Data Frame 
+    includes player id (as id), team_id, position (x,y), velocity (v_x,v_y), field 
+    position(as position), and player name (as short_name).
+    """
     # check that the frame has tracking
     if not match_tracking_data[frame]["player_data"]:
         return None
@@ -122,6 +127,11 @@ def create_player_positions(match_data,match_tracking_data,frame):
     return player_positions
 
 def ball_position(match_tracking_data,frame):
+    """
+    Takes match_tracking_data and frame and returns the location of the 
+    soccer ball. 
+    
+    """
     if not match_tracking_data[frame]["ball_data"]:
         return None
     ball_x = match_tracking_data[frame]["ball_data"]["x"]
@@ -129,6 +139,13 @@ def ball_position(match_tracking_data,frame):
     return ball_x, ball_y
 
 def player_pitch_control_at_coord(x,y,ball_x,ball_y,player_positions):
+    """
+    Computes pitch control at the coordinate (x,y) based on the ball position
+    (ball_x,ball_y) and the position of all the players (stored in player_positions).
+    The function returns the Data Frame player_postions with an additional column 
+    p_tot which gives the probability of each player controlling the ball. 
+
+    """
     # speed assumptions
     ball_speed = 15   # ball speed
     player_speed = 5  # max player speed
@@ -181,32 +198,163 @@ def player_pitch_control_at_coord(x,y,ball_x,ball_y,player_positions):
     
     
 def team_pitch_control_at_coord(x,y,ball_x,ball_y,player_positions,team_id):
+    """
+    Returns the pitch control at a certain location for the indicated team 
+    (team_id). 
+
+    """
     # compute player pitch control
     df = player_pitch_control_at_coord(x, y, ball_x, ball_y, player_positions)
     
     # sum over team_id
-    team_control = df[df.team_id == team_id].sum()
+    team_control = df.loc[df.team_id == team_id, "p_tot"].sum()
     
     return team_control
 
 def team_pitch_control_matrix(
-        ball_x,ball_y,player_positions,
-        team_id,pitch_length,pitch_width,dx=1,dy=1):
-    # initialize matrix of probabilities
-    rows = int(pitch_width/dy)
-    cols = int(pitch_length/dx)
-    probs = np.zeros((rows,cols))
-    # loop to compute probabilities (any way to speed up?)
-    for i in range(rows):
-        for j in range(cols):
-            x_c = -pitch_length/2 + dx*(j + 0.5)
-            y_c = -pitch_width/2 + dy*(i + 0.5)
-            
-            team_prob = team_pitch_control_at_coord(x_c,y_c,ball_x,ball_y,player_positions,team_id)
-            
-            probs[i,j] = team_prob
+    ball_x, ball_y, player_positions,
+    team_id, pitch_length, pitch_width, dx=1, dy=1
+    ):
+    """
+    Returns a matrix of the total team pitch control at each grid cell center. 
+    Rows index bottom -> top; cols index left -> right.
+    
+    This is vectorized to run  faster. 
+    
+    """
+    # parameters
+    ball_speed = 15.0
+    player_speed = 5.0
+    s = 0.37            # logistic parameter
+    l = 4.3             # control rate
+    dt = 0.04           # time step
+    t_lead = 0.7        # player reaction time
+    max_steps = 2500
+    eps = 1e-2
+
+    # set up pitch grid points for computation
+    rows = int(pitch_width / dy)
+    cols = int(pitch_length / dx)
+    x_centers = -pitch_length / 2 + dx * (np.arange(cols) + 0.5)  
+    y_centers = -pitch_width / 2 + dy * (np.arange(rows) + 0.5)   
+    Xg, Yg = np.meshgrid(x_centers, y_centers)   # (rows, cols)                  
+    G = rows * cols                              # number of matrix entries
+    X = Xg.ravel()  # (G, )
+    Y = Yg.ravel()  # (G, )
+
+    # turn player info into (P,) arrays (P = number of players)
+    df = player_positions  
+    px  = df["x"].to_numpy(dtype=float) 
+    py  = df["y"].to_numpy(dtype=float)  
+    vx  = df["v_x"].to_numpy(dtype=float)   
+    vy  = df["v_y"].to_numpy(dtype=float)  
+    pid = df["team_id"].to_numpy()
+    team_mask = (pid == team_id)            
+    P = px.shape[0]
+
+    # intermediate positions
+    x1 = px + t_lead * vx                 
+    y1 = py + t_lead * vy            
+
+    # time for the ball to reach each grid location
+    ball_time = np.hypot(X - ball_x, Y - ball_y) / ball_speed
+
+    # how long it takes each player to reach each grid position
+    dx_gp = X[:, None] - x1[None, :]        # (G,P)
+    dy_gp = Y[:, None] - y1[None, :]        # (G,P)
+    time_to_ball_gp = t_lead + np.hypot(dx_gp, dy_gp) / player_speed  # (G,P)
+
+    # now we can compute probabilities over one loop
+    p_tot_gp = np.zeros((G, P), dtype=float)   # probs for each grid point
+    S = np.ones(G, dtype=float)                # checking how close we are to prob sum = 1
+
+    for step in range(1, max_steps + 1):
+        t_now = ball_time + step * dt          # (G,)
+        F_gp = logistic.cdf(t_now[:, None], loc=time_to_ball_gp, scale=s)  # (G,P)
+        total_F = F_gp.sum(axis=1)             # (G,)
+        incr_gp = (S[:, None] * l * F_gp * dt) # (G,P)
+        p_tot_gp += incr_gp
+        S *= (1.0 - l * total_F * dt)         # update S
+        # global early stop when all grid points done
+        if np.all(1.0 - p_tot_gp.sum(axis=1) <= eps):
+            break
+
+    # sum players on requested team
+    team_prob_flat = p_tot_gp[:, team_mask].sum(axis=1)  # (G,)
+    probs = team_prob_flat.reshape(rows, cols)
     return probs
     
+
+def player_pitch_control_matrix(
+    ball_x, ball_y, player_positions,
+    player_id, pitch_length, pitch_width, dx=1, dy=1
+    ):
+    """
+    Computes a pitch control matrix for a single player (same signature/return).
+    Vectorized over all grid cells; loops only over time steps.
+    """
+    # parameters
+    ball_speed = 15.0
+    player_speed = 5.0
+    s = 0.37
+    l = 4.3
+    dt = 0.04
+    t_lead = 0.7
+    max_steps = 2500
+    eps = 1e-2
+
+    # set up pitch grid points for computation
+    rows = int(pitch_width / dy)
+    cols = int(pitch_length / dx)
+    x_centers = -pitch_length / 2 + dx * (np.arange(cols) + 0.5)  
+    y_centers = -pitch_width / 2 + dy * (np.arange(rows) + 0.5)   
+    Xg, Yg = np.meshgrid(x_centers, y_centers)   # (rows, cols)                  
+    G = rows * cols                              # number of matrix entries
+    X = Xg.ravel()  # (G, )
+    Y = Yg.ravel()  # (G, )
+
+    # turn player info into (P,) arrays (P = number of players)
+    df = player_positions  
+    px  = df["x"].to_numpy(dtype=float) 
+    py  = df["y"].to_numpy(dtype=float)  
+    vx  = df["v_x"].to_numpy(dtype=float)   
+    vy  = df["v_y"].to_numpy(dtype=float)  
+    pid = df["player_id"].to_numpy()        # changed from above
+    player_mask = (pid == player_id)        # changed from above -- to look at one player    
+    P = px.shape[0]
+
+    # intermediate positions
+    x1 = px + t_lead * vx                 
+    y1 = py + t_lead * vy            
+
+    # time for the ball to reach each grid location
+    ball_time = np.hypot(X - ball_x, Y - ball_y) / ball_speed
+
+    # how long it takes each player to reach each grid position
+    dx_gp = X[:, None] - x1[None, :]        # (G,P)
+    dy_gp = Y[:, None] - y1[None, :]        # (G,P)
+    time_to_ball_gp = t_lead + np.hypot(dx_gp, dy_gp) / player_speed  # (G,P)
+
+    # now we can compute probabilities over one loop
+    p_tot_gp = np.zeros((G, P), dtype=float)   # probs for each grid point
+    S = np.ones(G, dtype=float)                # checking how close we are to prob sum = 1
+
+    for step in range(1, max_steps + 1):
+        t_now = ball_time + step * dt          # (G,)
+        F_gp = logistic.cdf(t_now[:, None], loc=time_to_ball_gp, scale=s)  # (G,P)
+        total_F = F_gp.sum(axis=1)             # (G,)
+        incr_gp = (S[:, None] * l * F_gp * dt) # (G,P)
+        p_tot_gp += incr_gp
+        S *= (1.0 - l * total_F * dt)         # update S
+        # global early stop when all grid points done
+        if np.all(1.0 - p_tot_gp.sum(axis=1) <= eps):
+            break
+
+    # sum players on requested team
+    player_prob_flat = p_tot_gp[:, player_mask].sum(axis=1)  # (G,)
+    probs = player_prob_flat.reshape(rows, cols)
+    return probs
+
     
     
     
