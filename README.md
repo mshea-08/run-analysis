@@ -12,7 +12,9 @@ This project is currently in progress. On this page we will highlight the main m
 ## Working Table of Contents
 
 [Mathematical Description of the Model](#mathematical-description)
+
 [Current Code Available](#current-code-available)
+
 [Other Technical Descriptions](#other-technical-descriptions)
 
 ## Data Availability
