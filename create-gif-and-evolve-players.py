@@ -97,7 +97,9 @@ def create_run_gif(run_index, off_ball_runs_df, match_tracking_data, players_df,
         run_gif.seek(0)
     display(IPimg(data=run_gif.read()))
 
-create_run_gif(6,off_ball_runs_df,match_tracking_data,players_df,home_team,away_team,pitch, duration=125)
+# =================================
+# Add to tracking function - velocity averaged over a few states 
+# =================================
 
 def calculate_v(how_many_frames_back, frame_of_interest, match_tracking_data):
     """
@@ -140,46 +142,9 @@ def calculate_v(how_many_frames_back, frame_of_interest, match_tracking_data):
     velocities = pd.DataFrame(merged.to_dict(orient="records"))
     return velocities
 
-def calculate_v(how_many_frames_back, frame_of_interest, match_tracking_data):
-    """
-    Calculate player velocities between a previous frame and the current frame pulled from match tracking data.
-
-    Parameters:
-    how_many_frames_back : int
-        Number of frames to look back for velocity calculation
-    frame_of_interest : int
-        Current frame number (same as current frame's index)
-    match_tracking_data : df
-        tracking data containing player positions for a specific match
-
-    Returns:
-    velocities : df
-        df containing player_id, x_start, y_start, x_end, y_end, vx, and vy.
-    """
-    # --- find the frames ---
-    prior_frame_index = int(frame_of_interest) - int(how_many_frames_back)
-    prior_frame = pd.DataFrame(match_tracking_data[prior_frame_index]["player_data"])
-    current_frame = pd.DataFrame(match_tracking_data[frame_of_interest]["player_data"])
-
-    cols = ["player_id", "x", "y"] #cols were using to calculate v
-    prior_positions = prior_frame[cols] #gets prior x and y
-    current_positions = current_frame[cols] #current x and y
-
-    # merge start and end positions by player_id
-    merged = current_positions.merge(
-        prior_positions,
-        on="player_id",
-        suffixes=("_end", "_start"),
-        how="inner"  # only keep players present in both frames
-    )
-
-    # compute displacements and velocity
-    merged["vx"] = merged["x_end"] - merged["x_start"]
-    merged["vy"] = merged["y_end"] - merged["y_start"]
-
-    # convert to list of dicts
-    velocities = pd.DataFrame(merged.to_dict(orient="records"))
-    return velocities
+# ===========================================
+# State creation below
+# ===========================================
 
 #evolve players (uses the velocity function) and return residuals (error from projection) and calculated velocity
 def evolve_player_residuals(t, frame_of_interest, frames_before_for_v, match_tracking_data):
