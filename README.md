@@ -41,9 +41,9 @@ $$PV^{-r}(s) - PV^{-r}(\hat{s})$$
 
 For the code presented here, are possession value is given by, 
 
-$$PV^{-r}(s) = \sum_{p \in \mathcal{G}} xT(p) \cdot PC^{-r}(s;p)$$
+$$PV^{-r}(s) = \sum_{p \in G} xT(p) \cdot PC^{-r}(s;p)$$
 
-where $\mathcal{G}$ is a discretization of the pitch and $PC^{-r}(s)$ is the *runner removed pitch control*.
+where $G$ is a discretization of the pitch and $PC^{-r}(s)$ is the *runner removed pitch control*.
 
 ## Support Score, S(r)
 
@@ -57,9 +57,21 @@ For all values, larger score is better. The potential reception score is always 
 
 The key to the space manipulation and support scores is the generation of the **no-run counterfactual state**. The idea behind the no-run state is to produce a state where most players behave in the same way, however the runner does not attempt the run. Anyone whose behavior was *influenced* by the run should behave appropriately given the new circumstances. 
 
+The no-run state is built via a deterministic, principles based algorithm. We use basic concepts from physics--e.g. reaction time, maximum speed, etc--alongside soccer specific principles--e.g. goal side defending, lane blocking, defensive shape and spacing, etc--to create a series of position optimizing functions. The no-run state is only dependent on the **intial state** and **end state** of the run. For ease of computation it does not depend on intermediate frames. 
+
 Below we will outline the main steps to the no-run state, although we will omit some detail. For a more detailed accounting see, *upload paper*.
 
+## Move the Runner
+
+The first step is to move the runner. To move the runner, we begin with their initial position, $(x_i,y_i)$ and evolve their $x$ (downfield) position by the average downfield change in their teammates. We then adjust their $y$ positioning to satisfy minimal spacing requirement. The spacing requirement depend on where on the field the ball and runner are. 
+
+## Identify Influenced Defenders 
+
+
+
 # Current Code Available
+
+*Under construction.*
 
 ## Pitch Control 
 
@@ -80,22 +92,3 @@ The output is a matrix of probabilities, where the rows are indexed bottom -> to
 
 *Under construction.*
 
-## No Run State
-
-The no run state is a counterfactual state that assumes the runner did not actually make the run. The no-run state assumes most players are at their end of run positions. We only alter the location of the runner and any *influenced defenders*.
-
-First, the runners location is frozen according to their initial location (at the start of the run). The runners location is only further adjusted if one of the following is true:
-- The frozen runner becomes the last defender in the final state. In this case we move them up to be equal to their defensive line height.
-- (*Not Included Yet*) The frozen runner gets too close to the ball carrier. We assume the runner stays a minimum of 4 m away from the ball carrier.
-- (*Not Included Yet*) The frozen runner is offside in the final state. We adjust the runner to stay onside.
-
-Next, we compute the *main defender* at the initial frame. Note that their may be no main defender. To determine the main defender, we look at all defenders within 8 m of the runner. We then compute which of these defenders is closest to the *optimal position*. The *optimal position* is 2 m away from the runner on the line from the runner to the goal. For the main defender we apply the following:
-- Compute a region of potential placement. This region is formed from their initial and ending locations.
-- Within that region we look to maximize a position_score. The position score consists of the following elements, which are weighted differently in different regions of the pitch,
-  - Optimal positioning: Determines the ideal defensive positioning (independent of the other players). It takes into account where the goal is and where on the field the runner is.
-  - Pass lane blocking: Determines the best position to block a pass to the player.
-  - Overall defensive shape: If the player is a defender, this measures how much they align with the defensive line height. Additionally, for all positions, this measures how spaced out they are in relation to their teammates. 
-
-# Other Technical Descriptions 
-
-*Under construction.*
