@@ -3,15 +3,17 @@
 The goal of this project is to create a metric that evaluates the quality of off-ball runs made in a game of soccer. In particular, most means of measurement rely on the runner actually recieving a pass (and, secondarily, on the quality of that pass). We aim to produce a meaningful value that is independent of the result of the play sequence. 
 
 The off-ball run value, ORV, will rely on the following soccer principles:
-1. **Potential quality of the pass created.** This will consider both the feasibility of the intended pass as well as the danger created from the resulting pass.
-2. **Space manipulation caused by the run.** This will consider the space created for other players due to the action of the run.
-3. **Risk.** This will evaluate the risk of exposure if the ball is turned over.
+1. **Potential quality of the pass created (PR score).** This will consider both the feasibility of the intended pass as well as the danger created from the resulting pass.
+2. **Space manipulation caused by the run (SM score).** This will consider the space created for other players due to the action of the run.
+3. **Support (S score).**  This will consider the change in pressure and support around the ball carrier. 
 
-This project is currently in progress. On this page we will highlight the main mathematical principles as well as discuss the current files in the repository. 
+This page is in some amount of working order.
 
 ## Working Table of Contents
 
 [Mathematical Description of the Model](#mathematical-description)
+
+[No-Run State](#no-run-state)
 
 [Current Code Available](#current-code-available)
 
@@ -23,27 +25,39 @@ Tracking data has been provided by SkillCorner. For freely available tracking da
 
 # Mathematical Description
 
-## Revieved Run Value
+## Potential Reception Score, PR(r)
 
-This part will analyze the quality of the pass created by the run. *Under construction.*
+Let $xPass(r)$ denote the *expected pass completion* of the pass from the ball carrier to the runner and let $xT(r)$ denote the *expected threat* of the runner's position. Then the potential reception score is, 
 
-## Space Manipulation
+$$PR(r) = xT(r) \cdot xPass(r)$$
 
-This part will analyze the amount of space opened up by the run. 
+## Space Manipulation Score, SM(r)
 
-Let $s$ denote the state of play after the run has ended and let $\hat{s}$ denote the counterfactual state where no off-ball run is attempted. Essentially, the space manipulation factor is the difference, 
+This part will analyze the amount of space the runner creates for their teammates only. 
 
-$$EPV(s) - EPV(\hat{s})$$
+Let $s$ denote the state of play after the run has ended and let $\hat{s}$ denote the counterfactual state where no off-ball run is attempted. LEt $PV^{-r}(s)$ denote the *possession value* of a state with the runner removed from the state. Space manipulation is computed as, 
 
-where $EPV$ is the *expected possession value* of the states. 
+$$PV^{-r}(s) - PV^{-r}(\hat{s})$$
 
-### Counterfactual Run State
+For the code presented here, are possession value is given by, 
 
-The key to this metric is the generation of the no off-ball run counterfactual state. The idea behind the no-run counter factual state is to produce a state where most players behave in the same way, however the runner does not attempt the run and anyone whose behavior was immediately influenced by the run should behave appropriately given the new circumstances. 
+$$PV^{-r}(s) = \sum_{p \in \mathcal{G}} xT(p) \cdot PC^{-r}(s;p)$$
 
-## Risk
+where $\mathcal{G}$ is a discretization of the pitch and $PC^{-r}(s)$ is the *runner removed pitch control*.
 
-This part will analyze the amount of potential risk. *Under construction.* 
+## Support Score, S(r)
+
+The support score takes a radial neighborhood of the ball carrier and computes a weighted sum of the pitch control in this area. After that it looks at immediate pressure on the ball carrier and scales the score inversely with the pressure (more pressure $\implies$ smaller score).
+
+## Understanding the Component Values
+
+For all values, larger score is better. The potential reception score is always non-negative, however both the space manipulation score and support score may be negative. 
+
+# No-Run State
+
+The key to the space manipulation and support scores is the generation of the **no-run counterfactual state**. The idea behind the no-run state is to produce a state where most players behave in the same way, however the runner does not attempt the run. Anyone whose behavior was *influenced* by the run should behave appropriately given the new circumstances. 
+
+Below we will outline the main steps to the no-run state, although we will omit some detail. For a more detailed accounting see, *upload paper*.
 
 # Current Code Available
 
