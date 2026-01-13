@@ -90,6 +90,7 @@ def grid_points_in_disk(
     
     return pts
 
+
 def avg_near_seg(
         df,             # df containing positions
         x_col,          # col in df with x positions
@@ -154,6 +155,7 @@ def avg_near_seg(
 
     return np.average(y_near, weights=weights)
 
+
 def is_ball_in_attacking_final_third(
         ball_x,         # downfield position of ball
         pitch_length,   # length of pitch (skillcorner convention)
@@ -174,6 +176,70 @@ def is_ball_in_attacking_final_third(
         # Attacking goal at -half
         # Final third: x <= -half + pitch_length/3
         return ball_x <= (-half + pitch_length / 3.0)
+
+
+def closest_defender_to_point(
+        defender_positions, # df of all defender positions
+        x, 
+        y,               
+        ):
+    """
+    Return the player_id of the defender closest to (x, y),
+    or None if defender_positions is empty.
+    """
+    if defender_positions is None or defender_positions.empty:
+        return None
+
+    dists = np.hypot(
+        defender_positions["x"].to_numpy() - x,
+        defender_positions["y"].to_numpy() - y
+    )
+    idx = dists.argmin()
+    return defender_positions["player_id"].iloc[idx]
+
+
+def filter_points_near_vertical_segment(
+        points_xy, # array, col 0 = x, col 1 = y
+        x0, 
+        y1, 
+        y2, 
+        max_dist,
+        ):
+    """
+    Keep only points within max_dist of the vertical segment
+    x = x0, y in [y1, y2].
+
+    Returns array.
+    """
+    if points_xy.size == 0:
+        return points_xy
+
+    x = points_xy[:, 0]
+    y = points_xy[:, 1]
+
+    ymin, ymax = (y1, y2) if y1 <= y2 else (y2, y1)
+
+    dx = x - x0
+
+    within = (y >= ymin) & (y <= ymax)
+    below  = (y < ymin)
+    above  = (y > ymax)
+
+    dist = np.empty_like(dx, dtype=float)
+    
+    # straight horizontal distance if projection lies on segment
+    dist[within] = np.abs(dx[within])
+    
+    # distance to lower endpoint
+    dy_below = y[below] - ymin
+    dist[below] = np.sqrt(dx[below]**2 + dy_below**2)
+    
+    # distance to upper endpoint
+    dy_above = y[above] - ymax
+    dist[above] = np.sqrt(dx[above]**2 + dy_above**2)
+
+    mask = dist <= max_dist
+    return points_xy[mask]
 
 # ================================
 # Main Functions
@@ -478,25 +544,6 @@ def no_run_state_ball(
 
     return x, y
 
-def closest_defender_to_point(
-        defender_positions, # df of all defender positions
-        x, 
-        y,               
-        ):
-    """
-    Return the player_id of the defender closest to (x, y),
-    or None if defender_positions is empty.
-    """
-    if defender_positions is None or defender_positions.empty:
-        return None
-
-    dists = np.hypot(
-        defender_positions["x"].to_numpy() - x,
-        defender_positions["y"].to_numpy() - y
-    )
-    idx = dists.argmin()
-    return defender_positions["player_id"].iloc[idx]
-
 
 def classify_attackers_marking(
         attackers_end,  # df of attackers positions at end of run
@@ -553,51 +600,6 @@ def classify_attackers_marking(
     marked_xy   = attackers_xy[~unmarked_mask]
 
     return unmarked_xy, marked_xy
-
-
-
-def filter_points_near_vertical_segment(
-        points_xy, # array, col 0 = x, col 1 = y
-        x0, 
-        y1, 
-        y2, 
-        max_dist,
-        ):
-    """
-    Keep only points within max_dist of the vertical segment
-    x = x0, y in [y1, y2].
-
-    Returns array.
-    """
-    if points_xy.size == 0:
-        return points_xy
-
-    x = points_xy[:, 0]
-    y = points_xy[:, 1]
-
-    ymin, ymax = (y1, y2) if y1 <= y2 else (y2, y1)
-
-    dx = x - x0
-
-    within = (y >= ymin) & (y <= ymax)
-    below  = (y < ymin)
-    above  = (y > ymax)
-
-    dist = np.empty_like(dx, dtype=float)
-    
-    # straight horizontal distance if projection lies on segment
-    dist[within] = np.abs(dx[within])
-    
-    # distance to lower endpoint
-    dy_below = y[below] - ymin
-    dist[below] = np.sqrt(dx[below]**2 + dy_below**2)
-    
-    # distance to upper endpoint
-    dy_above = y[above] - ymax
-    dist[above] = np.sqrt(dx[above]**2 + dy_above**2)
-
-    mask = dist <= max_dist
-    return points_xy[mask]
 
 
 def choose_secondary_defender_y(
