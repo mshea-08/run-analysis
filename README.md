@@ -104,6 +104,8 @@ The function `add_velocities` adds velocities to all of tracking data. The funct
 
 ```
 from skillcorner.client import SkillcornerClient
+import pandas as pd
+from io import BytesIO
 from OrganizationFunction import add_velocities
 from OrganizationFunction import create_player_positions_2
 
@@ -119,31 +121,64 @@ match_tracking_data = client.get_match_tracking_data(match_id=match_id, params={
 
 match_tracking_data = sm.add_velocities(match_tracking_data)
 
-frame = # pick some frame
-frame_data = match_tracking_data[frame]
+# load skillcorner off-ball run infomation for the match of interest
+off_ball_runs_csv = client.get_dynamic_events_off_ball_runs(match_id=match_id, params={'file_format':'csv', 'ignore_dynamic_events_check': False})
+runs_df = pd.read_csv(BytesIO(off_ball_runs_csv))
 
-player_positions = create_player_positions_2(frame_data)
+idx = # pick a run
+run = runs_df.iloc[idx] # series for a singular run
+
+frame_start = run["frame_start"] # frame denoting the beginning of the run
+frame_end = run["frame_end"]     # frame denoting the end of the run
+
+frame_start_data = match_tracking_data[frame_start]
+frame_end_data = match_tracking_data[frame_start]
+
+player_positions_start = create_player_positions_2(frame_start_data)
+player_positions_end = create_player_positions_2(frame_end_data)
+```
+
+## No-Run State Functions
+
+The file NoRunStateFunctions.py contains the main no-run state function, `no_run_state`, and a bunch of intermediate and helper function. The functions are organized into two categories "helper" and "main" to help the reader identify what is used for what. The explanation of a few of the more important pieces:
+- `move_runner`: This function adjust the position of the runner to the correct no-run state position.
+- `position_score`: This function is used to adjust the *main defender*. For a given position it computes a position score (which we aim to optimize).
+- `classify_attackers_marking`: This function determines which attackers are *unmarked*. This is important for the positioning of the second defender, because the second defender will tend to position themselves closer to unmarked players.
+- `choose_seconday_defender_y`: Computes the new position of the secondary defender.
+The output of no-run state is a DataFrame with the same set up as the DataFrame created using the function `create_player_positions`.
+
+The below code is in addition to the code in the previous section and shows how to implement the no-run state functions. 
+
+## Possession Value Functions
+
+The file PossessionValueFunctions.py contains the following functions:
+- `team_pitch_control_matrix`: Computes a matrix (of specified dimensions) denoting the pitch control of the indicated team. The code currently implements one of the earliest and simplest algorithms of pitch control found in [this paper](https://www.researchgate.net/publication/315166647_Physics-Based_Modeling_of_Pass_Probabilities_in_Soccer) by Spearman and Bayse.
+- `team_pitch_control_runner_removed_matrix`: This function computes a pitch control matrix in the same manner as above, but does not include the runner in the computation.
+- `p_val_no_runner`: Computes the *runner removed possession value*. Note that the xT matrix used should be compatible with the pitch control matrix that is computed above. That means the dimensions and orientation should be the same. For this project we created an xT matrix and saved it locally using Wyscout data... I have yet to upload that file though.
+
+The following code gives an example of how to use these functions. This should be *in addition* to the code from the previous sections. 
+
+```
+from OrganizationFunctions import ball_position_2
+from PossessionValueFunction import team_pitch_control_runner_removed_matrix
+from 
 ```
 
 
 
 
-## Pitch Control 
 
-### Definition
 
-Pitch control is a model that implements basic principles from physics to compute which player/team is most likely to control the ball if it is moved to a given location on the pitch. The code currently implements one of the earliest and simplest algorithms of pitch control found in [this paper](https://www.researchgate.net/publication/315166647_Physics-Based_Modeling_of_Pass_Probabilities_in_Soccer) by Spearman and Bayse. 
 
-### Implementation Using the Code
 
-In TrackingFunctions.py there are two main functions concerning the pitch control of a given state: team_pitch_control_mat() and player_pitch_control_mat(). The functions take the following inputs:
-- the location of the ball (ball_x,ball_y),
-- a DataFrame consisting of the locations and velocities of all players (player_positions),
-- the size of the pitch (pitch_length, pitch_width),
-- the size of the grid spaces used (dx, dy),
-- and the team or player whos pitch control is to be computed (team_id or player_id).
 
-The output is a matrix of probabilities, where the rows are indexed bottom -> top and the columns are index left -> right. 
 
-*Under construction.*
+
+
+
+
+
+
+
+
 
