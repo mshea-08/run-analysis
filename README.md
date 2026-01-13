@@ -65,13 +65,68 @@ Below we will outline the main steps to the no-run state, although we will omit 
 
 The first step is to move the runner. To move the runner, we begin with their initial position, $(x_i,y_i)$ and evolve their $x$ (downfield) position by the average downfield change in their teammates. We then adjust their $y$ positioning to satisfy minimal spacing requirement. The spacing requirement depend on where on the field the ball and runner are. 
 
+There are a few checks on the runners position to check that their position is legal. For instance, we check that the runner is not offside or the player that creates the offside line (for their own team). 
+
 ## Identify Influenced Defenders 
 
+There are two types of defenders the algorithm classifies:
+- main defender: determined to be defending the runner in the initial state of the run.
+- secondary defender: determined to be defending the runner in the final state of the run.
+Note that the algorithm may determine that no one is the main and/or secondary defender. If they are determined to be the same player we say that there is no secondary defender.
 
+The main and secondary defenders are then given a *region of allowed movement*, which is determined by their starting and ending positions as well as the duration of the run. Within the region of movement an optimization function is used to produce the best location for the player. The optimization function for the main defender takes into account:
+- the position of the ball and runner on the field,
+- the defenders role (fwd/mid/def),
+- any potential pass that could be made to the runner,
+- and the defenders proximity to teammates.
+The optimization function for the secondary defender takes into account:
+- the position of the ball and runner on the field,
+- other marker and unmarked attackers near the defender,
+- and the proximity to teammates.
+
+## Potential Improvements to the No-Run State
+
+Below I would like to suggest some potential improvements that can be made to the no-run state. I also would like to encourage whoever is reading this to produce their own modifications and ideas!
+- Hard cutoffs to keep the runner in the bounds of the field. Surprisingly there were no examples where this was an issue, but there is the potential to "bump" the runner off the pitch given the constraints on proximity to teammates. This can be easily added, I just haven't.
+- Define and move *influenced teammates*. A good example of this would be the case where a runner moves downfield and a teammate moves to occupy the space they created. In the current set up the runner is moved to be some distance away from the teammate, but the teammate remains in this new position. It might be beneficial to give the teammate the ability to find another nearby pocket of space.
+- Expand the region of movement for the second defender. Currently the second defenders potential movement options are defined only by a line. This probably should be extended (at the expense of some time), however the optimization function may need modifications. It may be interested to look at more frame and determine the *time of contact* of the second defender with the runner.
+- Literally anything that makes it run fast. Per example it is not that slow, but for larger data analysis it would benefit from improvements. 
 
 # Current Code Available
 
-*Under construction.*
+Here I give a description of the code available and how to use it. There are quite a few helper functions along the way and I won't describe all of their uses. 
+
+## Organization Functions
+
+This will discuss the code contained in OrganizationFunctions.py. The purpose of this file is mainly to organize and prepare the skillcorner data for our analysis. 
+
+The function `add_velocities` adds velocities to all of tracking data. The functions `create_player_positions` and `create_player_positions_2` create the frame specific data frames that include relevant player information and their positions at the specified frame. These data frames are used throughout the code provided here. The functions `ball_position` and `ball_position_2` extract the location of the ball at a given fame. Below is a snipped of how these codes may be used. 
+
+```
+from skillcorner.client import SkillcornerClient
+from OrganizationFunction import add_velocities
+from OrganizationFunction import create_player_positions_2
+
+client = SkillcornerClient(username="username", password="password")
+
+# load NWSL match ids 
+matches = client.get_matches(params={'competition_edition': 800})
+match_ids = [entry['id'] for entry in matches] # creates an array of match_ids only
+
+match_id = # pick some match
+match_data = client.get_match(match_id=match_id) # match_data contains information about the teams, pitch, etc
+match_tracking_data = client.get_match_tracking_data(match_id=match_id, params={'data_version': 3}) # match_tracking_data contains all player positional data
+
+match_tracking_data = sm.add_velocities(match_tracking_data)
+
+frame = # pick some frame
+frame_data = match_tracking_data[frame]
+
+player_positions = create_player_positions_2(frame_data)
+```
+
+
+
 
 ## Pitch Control 
 
