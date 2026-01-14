@@ -150,20 +150,38 @@ The output of no-run state is a DataFrame with the same set up as the DataFrame 
 The below code is in addition to the code in the previous section and shows how to implement the no-run state functions. 
 
 ```
-Under construction
+from NoRunStateFunction import no_run_state
+
+player_positions_no_run = no_run_state(match_data, frame_start_data, frame_end_data, run)
 ```
 
-## Possession Value Functions
+## Possession Value Functions & Metric Computation
 
 The file PossessionValueFunctions.py contains the following functions:
 - `team_pitch_control_matrix`: Computes a matrix (of specified dimensions) denoting the pitch control of the indicated team. The code currently implements one of the earliest and simplest algorithms of pitch control found in [this paper](https://www.researchgate.net/publication/315166647_Physics-Based_Modeling_of_Pass_Probabilities_in_Soccer) by Spearman and Bayse.
 - `team_pitch_control_runner_removed_matrix`: This function computes a pitch control matrix in the same manner as above, but does not include the runner in the computation.
-- `p_val_no_runner`: Computes the *runner removed possession value*. Note that the xT matrix used should be compatible with the pitch control matrix that is computed above. That means the dimensions and orientation should be the same. For this project we created an xT matrix and saved it locally using Wyscout data... I have yet to upload that file though.
+- `p_val_no_runner`: Computes the *runner removed possession value*. Note that the xT matrix used should be compatible with the pitch control matrix that is computed above. That means the dimensions and orientation should be the same. For this project we created an xT matrix using Wyscout data and saved it locally. [this article](https://karun.in/blog/expected-threat.html) gives a great explanation on how to compute an xT model.
 
-The following code gives an example of how to use these functions. This should be *in addition* to the code from the previous sections. 
+The file MetricFunctions.py gives the final bit of code necessary for computing the metric values. It contains the following functions:
+- `support_value`: Computes the support metric component. This functions contains optional parameter inputs for the user to explore different weighting schemes (less/more emphasis on further away defenders, less/more emphasis on immediate pressure, how far out to consider defenders.
+- `compute_run_metrics`: Computes space manipulation and support metric values for a run series. The input involves amending the skillcorning run data with the initial and final frame and match data.
+- `attach_run_metrics`: Adds the metric values directly to runs DataFrame (after preloading frame and match data to the DataFrame).
+
+The following code gives an example of how to compute the metric values for a run. This should be *in addition* to the code from the previous sections. 
 
 ```
-Under construction
+from MetricFunctions.py import compute_run_metrics
+
+# first add match and frame data to run series
+run["match_data"] = match_data
+run["frame_start_data"] = frame_start_data
+run["frame_end_data"] = frame_end_data
+
+xT_grid = # load xT data
+
+# compute metric values
+sm_value, s_value = compute_run_metrics(run, xT_grid)
+pr_val = run["xthreat"]*run["xpass_completion"] # these are col already contained in the skillcorner advanced data
 ```
 
 
