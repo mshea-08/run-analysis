@@ -17,8 +17,6 @@ This page is in some amount of working order.
 
 [Current Code Available](#current-code-available)
 
-[Other Technical Descriptions](#other-technical-descriptions)
-
 ## Data Availability
 
 Tracking data has been provided by SkillCorner. For freely available tracking data check out [sample data](https://github.com/metrica-sports/sample-data) provided by Metrica. Note that the code provided here most likely needs to be edited to work for other data sources. 
