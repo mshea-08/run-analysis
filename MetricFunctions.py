@@ -18,7 +18,7 @@ from PossessionValueFunctions import team_pitch_control_matrix
 # Compute support score - metric component 3
 # ==========================================
 
-def support_surface_value(
+def support_value(
         player_positions,
         run_info,
         pitch_length,
@@ -182,8 +182,8 @@ def compute_run_metrics(
         )
     
 
-    # support_surface_value (end)
-    support_end = support_surface_value(
+    # support_value (end)
+    support_end = support_value(
         player_positions_end,
         run_info,
         pitch_length,
@@ -222,8 +222,8 @@ def compute_run_metrics(
         xT_grid
         )
 
-    # support_surface_value (no-run)
-    support_no_run = support_surface_value(
+    # support_value (no-run)
+    support_no_run = support_value(
         player_positions_no_run,
         run_info,
         pitch_length,
